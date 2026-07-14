@@ -7,7 +7,7 @@
         <div class="error">{{ error }}</div>
     {% endif %}
 
-    <form action="{{ '/articles/' + article.id + '/edit' if article else '/articles/new' }}" method="post">
+    <form action="{{ '/articles/' + article.id|string + '/edit' if article else '/articles/new' }}" method="post">
         
         <div class="form-group">
             <label for="url">Article URL *</label>
