@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+        <h1>Article Detail</h1>
+        <div>
+            <a href="/articles/{{ article.id }}/edit" class="btn btn-secondary">Edit Article</a>
+            <!-- Delete form requires POST -->
+            <form action="/articles/{{ article.id }}/delete" method="post" style="display: inline;" onsubmit="return confirmDelete()">
+                <button type="submit" class="btn btn-danger">Delete</button>
+            </form>
+        </div>
+    </div>
+
+    <div style="background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+        <div class="form-group">
+            <label>Title</label>
+            <h2 style="margin: 0;">{{ article.title or "Untitled Article" }}</h2>
+        </div>
+
+        <div class="form-group">
+            <label>Original Link</label>
+            <a href="{{ article.url }}" target="_blank">{{ article.url }}</a>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+            <div class="form-group">
+                <label>Publish Date</label>
+                <div>{{ article.publish_date if article.publish_date else 'Not provided' }}</div>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <div><strong>{{ article.status | upper }}</strong></div>
+            </div>
+        </div>
+
+        <div class="form-group">
+            <label>Added By</label>
+            <div>{{ article.added_by }} on {{ article.added_at.strftime('%Y-%m-%d %H:%M') }}</div>
+        </div>
+
+        <div class="form-group">
+            <label>Summary</label>
+            <p style="background: #fcfcfc; padding: 10px; border-left: 4px solid #ddd;">{{ article.summary or "No summary provided." }}</p>
+        </div>
+
+        <div class="tag-section">
+            <h3>Tags</h3>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                {% for category in ['country', 'sport', 'abuse_type', 'organisation'] %}
+                    <div>
+                        <label style="font-size: 13px; color: #666; text-transform: uppercase;">{{ category | replace('_', ' ') }}</label>
+                        <div>
+                            {% for tag in article.tags if tag.category == category %}
+                                <span class="tag-pill">{{ tag.name }}</span>
+                            {% else %}
+                                <span style="color: #ccc; font-style: italic; font-size: 13px;">None</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div style="margin-top: 20px;">
+        <a href="/" class="btn btn-secondary">← Back to List</a>
+    </div>
+
+    <script>
+        function confirmDelete() {
+            return confirm("Are you sure you want to delete this article? This action cannot be undone.");
+        }
+    </script>
+{% endblock %}
