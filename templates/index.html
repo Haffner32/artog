@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Logged Articles</h1>
+    <p>A collection of Safe Sport-related news and misconduct reports.</p>
+    
+    <div style="margin-bottom: 20px;">
+        <a href="/articles/new" class="btn btn-primary">+ Add New Article</a>
+        <a href="/search" class="btn btn-secondary">🔍 Advanced Search</a>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Title</th>
+                <th>Date Added</th>
+                <th>Country</th>
+                <th>Sport</th>
+                <th>Abuse Type</th>
+                <th>Added By</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for article in articles %}
+            <tr>
+                <td>
+                    <a href="{{ article.url }}" target="_blank" style="font-weight: bold; color: #2c3e50;">
+                        {{ article.title or "Untitled Article" }}
+                    </a> 
+                    <br>
+                    <small><a href="/articles/{{ article.id }}" style="color: #7f8c8d;">View Details →</a></small>
+                </td>
+                <td>{{ article.added_at.strftime('%Y-%m-%d') if article.added_at else 'N/A' }}</td>
+                <td>
+                    {% for tag in article.tags if tag.category == 'country' %}
+                        <span class="tag-pill">{{ tag.name }}</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% for tag in article.tags if tag.category == 'sport' %}
+                        <span class="tag-pill">{{ tag.name }}</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% for tag in article.tags if tag.category == 'abuse_type' %}
+                        <span class="tag-pill">{{ tag.name }}</span>
+                    {% endfor %}
+                </td>
+                <td>{{ article.added_by }}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" style="text-align: center; padding: 20px;">No articles logged yet. Start by adding one!</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endblock %}
