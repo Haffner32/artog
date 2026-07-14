@@ -187,10 +187,10 @@ def search(request: Request, q: str = None, country: str = None, sport: str = No
 
     # Tag filtering logic
     filters = []
-    if country: filters.append(models.Article.tags.any(models.Tag.category == 'country', models.Tag.name == country))
-    if sport: filters.append(models.Article.tags.any(models.Tag.category == 'sport', models.Tag.name == sport))
-    if abuse_type: filters.append(models.Article.tags.any(models.Tag.category == 'abuse_type', models.Tag.name == abuse_type))
-    if org: filters.append(models.Article.tags.any(models.Tag.category == 'organisation', models.Tag.name == org))
+    if country: filters.append(models.Article.tags.any(and_(models.Tag.category == 'country', models.Tag.name == country)))
+    if sport: filters.append(models.Article.tags.any(and_(models.Tag.category == 'sport', models.Tag.name == sport)))
+    if abuse_type: filters.append(models.Article.tags.any(and_(models.Tag.category == 'abuse_type', models.Tag.name == abuse_type)))
+    if org: filters.append(models.Article.tags.any(and_(models.Tag.category == 'organisation', models.Tag.name == org)))
 
     if filters:
         query = query.filter(and_(*filters))
