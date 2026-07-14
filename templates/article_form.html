@@ -7,21 +7,27 @@
         <div class="error">{{ error }}</div>
     {% endif %}
 
-    <form action="{{ '/articles/' + article.id|string + '/edit' if article else '/articles/new' }}" method="post">
+    <form id="article-form" action="{{ '/articles/' + article.id|string + '/edit' if article else '/articles/new' }}" method="post">
         
         <div class="form-group">
             <label for="url">Article URL *</label>
-            <input type="text" id="url" name="url" value="{{ article.url if article else '' }}" required placeholder="https://...">
+            <div style="display: flex; gap: 10px;">
+                <input type="text" id="url" name="url" value="{{ article.url if article else '' }}" required placeholder="https://..." style="flex: 1;">
+                <button type="button" id="autofill-btn" class="btn btn-secondary" style="white-space: nowrap;">Auto-fill from URL</button>
+            </div>
+            <div id="autofill-status" style="margin-top: 6px; font-size: 13px;"></div>
         </div>
 
         <div class="form-group">
             <label for="title">Title</label>
             <input type="text" id="title" name="title" value="{{ article.title if article else '' }}" placeholder="Will try to auto-fill from URL if left blank">
+            <div id="title-msg" class="field-msg"></div>
         </div>
 
         <div class="form-group">
             <label for="publish_date">Publish Date</label>
             <input type="date" id="publish_date" name="publish_date" value="{{ article.publish_date.isoformat() if article and article.publish_date else '' }}">
+            <div id="publish_date-msg" class="field-msg"></div>
         </div>
 
         <div class="form-group">
@@ -32,6 +38,7 @@
         <div class="form-group">
             <label for="summary">Summary</label>
             <textarea id="summary" name="summary" rows="3">{{ article.summary if article else '' }}</textarea>
+            <div id="summary-msg" class="field-msg"></div>
         </div>
 
         <div class="form-group">
@@ -73,4 +80,79 @@
             <a href="/" class="btn btn-secondary">Cancel</a>
         </div>
     </form>
+
+    <script>
+        const autofillBtn = document.getElementById('autofill-btn');
+        const statusDiv = document.getElementById('autofill-status');
+        const urlInput = document.getElementById('url');
+
+        function setFieldMsg(fieldId, message) {
+            const el = document.getElementById(fieldId + '-msg');
+            if (el) {
+                el.textContent = message;
+                el.style.color = message ? '#c0392b' : '';
+                el.style.fontSize = '13px';
+                el.style.marginTop = '4px';
+            }
+        }
+
+        function clearFieldMsgs() {
+            ['title', 'summary', 'publish_date'].forEach(id => setFieldMsg(id, ''));
+        }
+
+        autofillBtn.addEventListener('click', async () => {
+            const url = urlInput.value.trim();
+            if (!url) {
+                statusDiv.textContent = 'Enter a URL first.';
+                statusDiv.style.color = '#c0392b';
+                return;
+            }
+
+            clearFieldMsgs();
+            statusDiv.textContent = 'Fetching details...';
+            statusDiv.style.color = '#7f8c8d';
+            autofillBtn.disabled = true;
+
+            try {
+                const response = await fetch(`/articles/fetch-metadata?url=${encodeURIComponent(url)}`);
+                const data = await response.json();
+
+                if (!data.success) {
+                    statusDiv.textContent = data.error || "Couldn't auto-detect details. Please enter them manually.";
+                    statusDiv.style.color = '#c0392b';
+                    autofillBtn.disabled = false;
+                    return;
+                }
+
+                statusDiv.textContent = 'Done. Fields below were filled in where possible.';
+                statusDiv.style.color = '#27ae60';
+
+                const titleInput = document.getElementById('title');
+                if (data.title) {
+                    titleInput.value = data.title;
+                } else {
+                    setFieldMsg('title', "Couldn't auto-detect a title. Please enter one manually.");
+                }
+
+                const summaryInput = document.getElementById('summary');
+                if (data.summary) {
+                    summaryInput.value = data.summary;
+                } else {
+                    setFieldMsg('summary', "Couldn't auto-detect a summary. Please enter one manually.");
+                }
+
+                const dateInput = document.getElementById('publish_date');
+                if (data.publish_date) {
+                    dateInput.value = data.publish_date;
+                } else {
+                    setFieldMsg('publish_date', "Couldn't auto-detect a publish date. Please enter one manually.");
+                }
+            } catch (err) {
+                statusDiv.textContent = "Something went wrong reaching the server. Please enter details manually.";
+                statusDiv.style.color = '#c0392b';
+            } finally {
+                autofillBtn.disabled = false;
+            }
+        });
+    </script>
 {% endblock %}

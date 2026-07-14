@@ -102,26 +102,74 @@ def test_create_article_duplicate_url_fails(client, sample_tag):
     assert "already been logged" in response.text
 
 
-def test_create_article_auto_fills_title_when_blank(client, sample_tag):
-    with patch("main.fetch_title_from_url", return_value="Scraped Title"):
+def test_create_article_without_title_saves_as_untitled(client, sample_tag):
+    # Auto-fill is now a separate client-side action (the "Auto-fill from URL"
+    # button calling /articles/fetch-metadata), so saving with a blank title
+    # should no longer trigger a server-side scrape.
+    with patch("main.fetch_article_metadata") as mock_fetch:
         client.post("/articles/new", data={
             "url": "https://example.com/no-title",
             "added_by": "Grace",
             "tags_ids": [str(sample_tag.id)],
         })
-    response = client.get("/")
-    assert "Scraped Title" in response.text
-
-
-def test_create_article_keeps_explicit_title_over_scrape(client, sample_tag):
-    with patch("main.fetch_title_from_url", return_value="Should Not Appear") as mock_fetch:
-        client.post("/articles/new", data={
-            "url": "https://example.com/explicit-title",
-            "title": "My Explicit Title",
-            "added_by": "Heidi",
-            "tags_ids": [str(sample_tag.id)],
-        })
         mock_fetch.assert_not_called()
+    response = client.get("/")
+    assert "Untitled Article" in response.text
+
+
+def test_create_article_keeps_explicit_title(client, sample_tag):
+    client.post("/articles/new", data={
+        "url": "https://example.com/explicit-title",
+        "title": "My Explicit Title",
+        "added_by": "Heidi",
+        "tags_ids": [str(sample_tag.id)],
+    })
+    response = client.get("/")
+    assert "My Explicit Title" in response.text
+
+
+# ---------------------------------------------------------------------------
+# Auto-fill metadata endpoint (GET /articles/fetch-metadata)
+# ---------------------------------------------------------------------------
+
+def test_fetch_metadata_success_returns_all_fields(client):
+    with patch("main.fetch_article_metadata", return_value={
+        "title": "Scraped Title",
+        "summary": "Scraped summary text.",
+        "publish_date": "2026-01-15",
+    }):
+        response = client.get("/articles/fetch-metadata", params={"url": "https://example.com/article"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["title"] == "Scraped Title"
+    assert data["summary"] == "Scraped summary text."
+    assert data["publish_date"] == "2026-01-15"
+
+
+def test_fetch_metadata_partial_fields_returns_nulls_for_missing(client):
+    with patch("main.fetch_article_metadata", return_value={
+        "title": "Scraped Title",
+        "summary": None,
+        "publish_date": None,
+    }):
+        response = client.get("/articles/fetch-metadata", params={"url": "https://example.com/article"})
+    data = response.json()
+    assert data["success"] is True
+    assert data["title"] == "Scraped Title"
+    assert data["summary"] is None
+    assert data["publish_date"] is None
+
+
+def test_fetch_metadata_request_failure_returns_error(client):
+    import requests
+    with patch("main.fetch_article_metadata", side_effect=requests.exceptions.RequestException("blocked")):
+        response = client.get("/articles/fetch-metadata", params={"url": "https://example.com/blocked"})
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is False
+    assert data["title"] is None
+    assert "error" in data
 
 
 # ---------------------------------------------------------------------------
