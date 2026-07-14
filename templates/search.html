@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h1>Search & Filter</h1>
+    <p>Find articles using keywords or by filtering through categories.</p>
+
+    <div style="display: grid; grid-template-columns: 300px 1fr; gap: 30px;">
+        <!-- Sidebar Filters -->
+        <aside>
+            <form method="get" action="/search">
+                <div class="form-group">
+                    <label for="q">Keyword Search</label>
+                    <input type="text" id="q" name="q" value="{{ request.query_params.get('q', '') }}" placeholder="Search title or summary...">
+                </div>
+
+                <div class="tag-section">
+                    <h3>Filters</h3>
+                    
+                    {% for category, cat_tags in tags.items() %}
+                        <div class="tag-category">
+                            <label>{{ category | replace('_', ' ') | capitalize }}</label>
+                            <select name="{{ 'org' if category == 'organisation' else category }}">
+                                <option value="">All {{ category | replace('_', ' ') }}</option>
+                                {% for tag in cat_tags %}
+                                    <option value="{{ tag.name }}" 
+                                        {{ 'selected' if request.query_params.get('org' if category == 'organisation' else category) == tag.name else '' }}>
+                                        {{ tag.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    {% endfor %}
+
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Apply Filters</button>
+                    <a href="/search" class="btn btn-secondary" style="width: 93%; display: block; text-align: center; margin-top: 10px;">Clear All</a>
+                </div>
+            </form>
+        </aside>
+
+        <!-- Results Area -->
+        <section>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Title</th>
+                        <th>Date Added</th>
+                        <th>Added By</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for article in articles %}
+                    <tr>
+                        <td>
+                            <a href="{{ article.url }}" target="_blank" style="font-weight: bold; color: #2c3e50;">
+                                {{ article.title or "Untitled Article" }}
+                            </a> 
+                            <br>
+                            <small><a href="/articles/{{ article.id }}" style="color: #7f8c8d;">View Details →</a></small>
+                        </td>
+                        <td>{{ article.added_at.strftime('%Y-%m-%d') if article.added_at else 'N/A' }}</td>
+                        <td>{{ article.added_by }}</td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="3" style="text-align: center; padding: 20px;">No articles match your search criteria.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </div>
+{% endblock %}

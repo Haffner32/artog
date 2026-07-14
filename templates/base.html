@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Safe Sport Article Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', path='/style.css') }}">
+</head>
+<body>
+
+    <nav>
+        <strong>🛡️ Safe Sport Tracker</strong> | 
+        <a href="/">Home</a> 
+        <a href="/articles/new">+ Add Article</a> 
+        <a href="/search">Search & Filter</a>
+    </nav>
+
+    <main>
+        {% block content %}
+        <!-- Page specific content goes here -->
+        {% endblock %}
+    </main>
+
+    <footer style="margin-top: 50px; font-size: 12px; color: #888; text-align: center;">
+        MVP Internal Tool - Localhost Only
+    </footer>
+
+</body>
+</html>
