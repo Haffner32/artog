@@ -43,9 +43,7 @@ def fetch_title_from_url(url: str):
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
     articles = db.query(models.Article).order_by(models.Article.added_at.desc()).all()
-    return templates.TemplateResponse(
-        name="index.html", 
-        context={"request": request, "articles": articles}
+    return templates.TemplateResponse(request, "index.html", {"articles": articles}
     )
 
 
@@ -56,10 +54,11 @@ def new_article_form(request: Request, db: Session = Depends(get_db)):
     # Group tags by category for the UI
     categories = ['country', 'sport', 'abuse_type', 'organisation']
     grouped_tags = {cat: [t for t in tags if t.category == cat] for cat in categories}
-    return templates.TemplateResponse("article_form.html", {"request": request, "tags": grouped_tags, "article": None})
+    return templates.TemplateResponse(request, "article_form.html", {"tags": grouped_tags, "article": None})
 
 @app.post("/articles/new")
 def create_article(
+    request: Request,
     url: str = Form(...), 
     title: str = Form(None), 
     publish_date: str = Form(None), 
@@ -70,14 +69,24 @@ def create_article(
     new_tags: str = Form(None),  # Comma separated new tags in format "cat:val,cat:val"
     db: Session = Depends(get_db)
 ):
+    categories = ['country', 'sport', 'abuse_type', 'organisation']
+
+    def get_grouped_tags():
+        all_tags = db.query(models.Tag).all()
+        return {cat: [t for t in all_tags if t.category == cat] for cat in categories}
+
     # 1. Check for duplicate URL
     existing = db.query(models.Article).filter(models.Article.url == url).first()
     if existing:
-        return templates.TemplateResponse("article_form.html", {
-            "request": Request(), 
-            "error": f"This URL has already been logged: {existing.title} ({existing.added_at})",
-            "tags": {} # Simplified for error state
-        }, status_code=400)
+        return templates.TemplateResponse(
+            request, "article_form.html",
+            {
+                "error": f"This URL has already been logged: {existing.title} ({existing.added_at})",
+                "tags": get_grouped_tags(),
+                "article": None
+            },
+            status_code=400
+        )
 
     # 2. Auto-fill title if not provided
     if not title:
@@ -85,7 +94,15 @@ def create_article(
 
     # 3. Validation: At least one tag required
     if not tags_ids and not new_tags:
-        return templates.TemplateResponse("article_form.html", {"request": Request(), "error": "At least one tag is required."}, status_code=400)
+        return templates.TemplateResponse(
+            request, "article_form.html",
+            {
+                "error": "At least one tag is required.",
+                "tags": get_grouped_tags(),
+                "article": None
+            },
+            status_code=400
+        )
 
     # Create Article object
     pub_date = date.fromisoformat(publish_date) if publish_date else None
@@ -118,7 +135,7 @@ def create_article(
 def article_detail(request: Request, id: int, db: Session = Depends(get_db)):
     article = db.query(models.Article).get(id)
     if not article: raise HTTPException(status_code=404)
-    return templates.TemplateResponse("article_detail.html", {"request": request, "article": article})
+    return templates.TemplateResponse(request, "article_detail.html", {"article": article})
 
 @app.get("/articles/{id}/edit", response_class=HTMLResponse)
 def edit_article_form(request: Request, id: int, db: Session = Depends(get_db)):
@@ -126,7 +143,7 @@ def edit_article_form(request: Request, id: int, db: Session = Depends(get_db)):
     tags = db.query(models.Tag).all()
     categories = ['country', 'sport', 'abuse_type', 'organisation']
     grouped_tags = {cat: [t for t in tags if t.category == cat] for cat in categories}
-    return templates.TemplateResponse("article_form.html", {"request": request, "tags": grouped_tags, "article": article})
+    return templates.TemplateResponse(request, "article_form.html", {"tags": grouped_tags, "article": article})
 
 @app.post("/articles/{id}/edit")
 def update_article(
@@ -183,4 +200,4 @@ def search(request: Request, q: str = None, country: str = None, sport: str = No
     categories = ['country', 'sport', 'abuse_type', 'organisation']
     grouped_tags = {cat: [t for t in tags if t.category == cat] for cat in categories}
     
-    return templates.TemplateResponse("search.html", {"request": request, "articles": results, "tags": grouped_tags})
+    return templates.TemplateResponse(request, "search.html", {"articles": results, "tags": grouped_tags})
