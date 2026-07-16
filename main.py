@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
+from types import SimpleNamespace
 from datetime import date
 
 import models
@@ -83,6 +84,23 @@ def fetch_article_metadata(url: str):
 
     return {"title": title, "summary": summary, "publish_date": publish_date}
 
+def _rebuild_form_state(url, title, publish_date, added_by, summary, status):
+    """Returns a fake 'article' from submitted form data so the form re-renders with the user's input intact after validation error."""
+    try:
+        pub_date = date.fromisoformat(publish_date) if publish_date else None
+    except ValueError:
+        pub_date = None
+    return SimpleNamespace(
+        id=None,
+        url=url,
+        title=title,
+        publish_date=pub_date,
+        added_by=added_by,
+        summary=summary,
+        status=status,
+        tags=[]
+    )
+
 def _grouped_tags(db):
     tags = db.query(models.Tag).all()
     categories = ['country', 'sport', 'abuse_type', 'organisation']
@@ -137,7 +155,9 @@ def create_article(
     if not tags_ids and not new_tags:
         return templates.TemplateResponse(
             request, "article_form.html",
-            {"error": "At least one tag is required.", "tags": _grouped_tags(db), "article": None},
+            {"error": "At least one tag is required.",
+             "tags": _grouped_tags(db),
+             "article": _rebuild_form_state(url, title, publish_date, added_by, summary, status)},
             status_code=400
         )
 
