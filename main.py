@@ -1,5 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
+from htmldate import find_date
 from fastapi import FastAPI, Request, Form, Depends, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
@@ -72,15 +73,8 @@ def fetch_article_metadata(url: str):
         summary = meta_desc["content"].strip()
 
     # --- Publish date ---
-    publish_date = None
-    published_meta = soup.find("meta", property="article:published_time")
-    if published_meta and published_meta.get("content"):
-        raw_date = published_meta["content"].strip()
-        try:
-            # Handles both plain dates and full ISO datetimes with timezone offsets
-            publish_date = date.fromisoformat(raw_date[:10]).isoformat()
-        except ValueError:
-            publish_date = None
+    publish_date = find_date(response.text, url=url)
+    
 
     return {"title": title, "summary": summary, "publish_date": publish_date}
 
