@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request, Form, Depends, HTTPException
 from fastapi.responses import RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from datetime import date
@@ -16,6 +17,17 @@ models.Base.metadata.create_all(bind=engine)
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_404_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code == 404:
+        return templates.TemplateResponse(
+            request,
+            "404.html", 
+            {"request": request, "detail": exc.detail},
+            status_code=404
+        )
+    return HTMLResponse(content=str(exc.detail), status_code=exc.status_code)
 
 @app.on_event("startup")
 def on_startup():
@@ -136,7 +148,7 @@ def create_article(
 
     if tags_ids:
         for tid in tags_ids:
-            tag = db.query(models.Tag).get(int(tid))
+            tag = db.get(models.Tag, int(tid))
             if tag: new_art.tags.append(tag)
 
     if new_tags:
@@ -155,13 +167,15 @@ def create_article(
 
 @app.get("/articles/{id}", response_class=HTMLResponse)
 def article_detail(request: Request, id: int, db: Session = Depends(get_db)):
-    article = db.query(models.Article).get(id)
+    article = db.get(models.Article, id)
     if not article: raise HTTPException(status_code=404)
     return templates.TemplateResponse(request, "article_detail.html", {"article": article})
 
 @app.get("/articles/{id}/edit", response_class=HTMLResponse)
 def edit_article_form(request: Request, id: int, db: Session = Depends(get_db)):
-    article = db.query(models.Article).get(id)
+    article = db.get(models.Article, id)
+    if not article:
+        raise HTTPException(status_code=404, detail=f"Article with id {id} not found")
     return templates.TemplateResponse(request, "article_form.html", {"tags": _grouped_tags(db), "article": article})
 
 @app.post("/articles/{id}/edit")
@@ -171,7 +185,9 @@ def update_article(
     summary: str = Form(None), status: str = Form("new"),
     tags_ids: list = Form(None), db: Session = Depends(get_db)
 ):
-    article = db.query(models.Article).get(id)
+    article = db.get(models.Article, id)
+    if not article:
+        raise HTTPException(status_code=404, detail=f"Article with id {id} not found")
     article.url = url
     article.title = title
     article.publish_date = date.fromisoformat(publish_date) if publish_date else None
@@ -182,7 +198,7 @@ def update_article(
     article.tags = []
     if tags_ids:
         for tid in tags_ids:
-            tag = db.query(models.Tag).get(int(tid))
+            tag = db.get(models.Tag, int(tid))
             if tag: article.tags.append(tag)
 
     db.commit()
@@ -190,7 +206,9 @@ def update_article(
 
 @app.post("/articles/{id}/delete")
 def delete_article(id: int, db: Session = Depends(get_db)):
-    article = db.query(models.Article).get(id)
+    article = db.get(models.Article, id)
+    if not article:
+        raise HTTPException(status_code=404, detail=f"Article with id {id} not found")
     db.delete(article)
     db.commit()
     return RedirectResponse(url="/", status_code=303)
