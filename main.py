@@ -73,19 +73,19 @@ def fetch_article_metadata(url: str):
         summary = meta_desc["content"].strip()
 
     # --- Publish date ---
-    publish_date = find_date(response.text, url=url)
+    publish_date = find_date(response.text, url=url, original_date=True)
     
 
     return {"title": title, "summary": summary, "publish_date": publish_date}
 
-def _rebuild_form_state(url, title, publish_date, added_by, summary, status):
+def _rebuild_form_state(url, title, publish_date, added_by, summary, status, article_id=None):
     """Returns a fake 'article' from submitted form data so the form re-renders with the user's input intact after validation error."""
     try:
         pub_date = date.fromisoformat(publish_date) if publish_date else None
     except ValueError:
         pub_date = None
     return SimpleNamespace(
-        id=None,
+        id=article_id,
         url=url,
         title=title,
         publish_date=pub_date,
@@ -194,14 +194,26 @@ def edit_article_form(request: Request, id: int, db: Session = Depends(get_db)):
 
 @app.post("/articles/{id}/edit")
 def update_article(
+    request: Request,
     id: int, url: str = Form(...), title: str = Form(None),
     publish_date: str = Form(None), added_by: str = Form(None),
     summary: str = Form(None), status: str = Form("new"),
-    tags_ids: list = Form(None), db: Session = Depends(get_db)
+    tags_ids: list = Form(None), new_tags: str = Form(None),
+    db: Session = Depends(get_db)
 ):
     article = db.get(models.Article, id)
     if not article:
         raise HTTPException(status_code=404, detail=f"Article with id {id} not found")
+
+    if not tags_ids and not new_tags:
+        return templates.TemplateResponse(
+            request, "article_form.html",
+            {"error": "At least one tag is required.",
+             "tags": _grouped_tags(db),
+             "article": _rebuild_form_state(url, title, publish_date, added_by, summary, status, article_id=id)},
+            status_code=400
+        )
+
     article.url = url
     article.title = title
     article.publish_date = date.fromisoformat(publish_date) if publish_date else None
@@ -214,6 +226,17 @@ def update_article(
         for tid in tags_ids:
             tag = db.get(models.Tag, int(tid))
             if tag: article.tags.append(tag)
+
+    if new_tags:
+        for entry in new_tags.split(','):
+            if ':' in entry:
+                cat, val = entry.split(':', 1)
+                cat, val = cat.strip(), val.strip()
+                tag = db.query(models.Tag).filter_by(name=val, category=cat).first()
+                if not tag:
+                    tag = models.Tag(name=val, category=cat)
+                    db.add(tag)
+                article.tags.append(tag)
 
     db.commit()
     return RedirectResponse(url=f"/articles/{id}", status_code=303)
