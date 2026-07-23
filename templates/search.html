@@ -1,72 +1,192 @@
 {% extends "base.html" %}
 
 {% block content %}
-    <h1>Search & Filter</h1>
-    <p>Find articles using keywords or by filtering through categories.</p>
-
-    <div style="display: grid; grid-template-columns: 300px 1fr; gap: 30px;">
-        <!-- Sidebar Filters -->
-        <aside>
-            <form method="get" action="/search">
-                <div class="form-group">
-                    <label for="q">Keyword Search</label>
-                    <input type="text" id="q" name="q" value="{{ request.query_params.get('q', '') }}" placeholder="Search title or summary...">
-                </div>
-
-                <div class="tag-section">
-                    <h3>Filters</h3>
-                    
-                    {% for category, cat_tags in tags.items() %}
-                        <div class="tag-category">
-                            <label>{{ category | replace('_', ' ') | capitalize }}</label>
-                            <select name="{{ 'org' if category == 'organisation' else category }}">
-                                <option value="">All {{ category | replace('_', ' ') }}</option>
-                                {% for tag in cat_tags %}
-                                    <option value="{{ tag.name }}" 
-                                        {{ 'selected' if request.query_params.get('org' if category == 'organisation' else category) == tag.name else '' }}>
-                                        {{ tag.name }}
-                                    </option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                    {% endfor %}
-
-                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px;">Apply Filters</button>
-                    <a href="/search" class="btn btn-secondary" style="width: 93%; display: block; text-align: center; margin-top: 10px;">Clear All</a>
-                </div>
-            </form>
-        </aside>
-
-        <!-- Results Area -->
-        <section>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Title</th>
-                        <th>Date Added</th>
-                        <th>Added By</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for article in articles %}
-                    <tr>
-                        <td>
-                            <a href="{{ article.url }}" target="_blank" style="font-weight: bold; color: #2c3e50;">
-                                {{ article.title or "Untitled Article" }}
-                            </a> 
-                            <br>
-                            <small><a href="/articles/{{ article.id }}" style="color: #7f8c8d;">View Details →</a></small>
-                        </td>
-                        <td>{{ article.added_at.strftime('%Y-%m-%d') if article.added_at else 'N/A' }}</td>
-                        <td>{{ article.added_by }}</td>
-                    </tr>
-                    {% else %}
-                    <tr>
-                        <td colspan="3" style="text-align: center; padding: 20px;">No articles match your search criteria.</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </section>
+    <div class="page-header">
+        <div>
+            <h1>Search & Filter</h1>
+            <p>Find articles using keywords or by filtering through categories.</p>
+        </div>
     </div>
+
+    <form method="get" action="/search" id="search-form">
+        <div class="search-bar-row">
+            <input type="text" id="q" name="q" value="{{ request.query_params.get('q', '') }}" placeholder="Search title or summary...">
+            <button type="button" class="btn btn-secondary" id="open-filters-btn">
+                🔍 Filters{% if active_filter_count %} ({{ active_filter_count }}){% endif %}
+            </button>
+            <button type="submit" class="btn btn-primary">Search</button>
+        </div>
+
+        <dialog id="filters-dialog">
+            <div class="dialog-header">
+                <h3>Filters</h3>
+                <button type="button" class="dialog-close" id="close-filters-btn" aria-label="Close">✕</button>
+            </div>
+
+            <div class="dialog-body">
+                {% for category, cat_tags in tags.items() %}
+                    <div class="tag-category">
+                        <label>{{ category | replace('_', ' ') | capitalize }}</label>
+                        <select name="{{ 'org' if category == 'organisation' else category }}">
+                            <option value="">All {{ category | replace('_', ' ') }}</option>
+                            {% for tag in cat_tags %}
+                                <option value="{{ tag.name }}"
+                                    {{ 'selected' if request.query_params.get('org' if category == 'organisation' else category) == tag.name else '' }}>
+                                    {{ tag.name }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                {% endfor %}
+
+                <!-- Year/Month calendar-style picker -->
+                <div class="tag-category">
+                    <label>Publish Date</label>
+                    <button type="button" class="date-picker-trigger" id="date-picker-btn">
+                        <span id="date-picker-label">All dates</span>
+                        <span class="date-picker-icon">📅</span>
+                    </button>
+                    <input type="hidden" name="year" id="year-input" value="{{ request.query_params.get('year', '') }}">
+                    <input type="hidden" name="month" id="month-input" value="{{ request.query_params.get('month', '') }}">
+
+                    <div class="date-picker-popover" id="date-picker-popover" hidden>
+                        <div class="date-picker-panel" id="year-panel">
+                            <div class="date-picker-panel-header">Select Year</div>
+                            <div class="date-picker-grid">
+                                <button type="button" class="date-picker-cell" data-year="">All years</button>
+                                {% for y in available_years %}
+                                    <button type="button" class="date-picker-cell" data-year="{{ y }}">{{ y }}</button>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <div class="date-picker-panel" id="month-panel" hidden>
+                            <div class="date-picker-panel-header">
+                                <button type="button" class="date-picker-back" id="back-to-years">← <span id="selected-year-label"></span></button>
+                            </div>
+                            <div class="date-picker-grid">
+                                <button type="button" class="date-picker-cell" data-month="">Whole year</button>
+                                {% for m, name in [(1,"Jan"),(2,"Feb"),(3,"Mar"),(4,"Apr"),(5,"May"),(6,"Jun"),(7,"Jul"),(8,"Aug"),(9,"Sep"),(10,"Oct"),(11,"Nov"),(12,"Dec")] %}
+                                    <button type="button" class="date-picker-cell" data-month="{{ m }}">{{ name }}</button>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dialog-footer">
+                <a href="/search{{ '?q=' + request.query_params.get('q') if request.query_params.get('q') else '' }}" class="btn btn-secondary">Clear Filters</a>
+                <button type="submit" class="btn btn-primary">Apply Filters</button>
+            </div>
+        </dialog>
+    </form>
+
+    <section>
+        <table>
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Date Added</th>
+                    <th>Added By</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for article in articles %}
+                <tr>
+                    <td data-label="Title">
+                        <a href="{{ article.url }}" target="_blank" style="font-weight: bold; color: #2c3e50;">
+                            {{ article.title or "Untitled Article" }}
+                        </a>
+                        <br>
+                        <small><a href="/articles/{{ article.id }}" style="color: #7f8c8d;">View Details →</a></small>
+                    </td>
+                    <td data-label="Date Added">{{ article.added_at.strftime('%Y-%m-%d') if article.added_at else 'N/A' }}</td>
+                    <td data-label="Added By">{{ article.added_by }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="3" style="text-align: center; padding: 20px;">No articles match your search criteria.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </section>
+
+    <script>
+        // Filters dialog open/close
+        const dialog = document.getElementById('filters-dialog');
+        document.getElementById('open-filters-btn').addEventListener('click', () => dialog.showModal());
+        document.getElementById('close-filters-btn').addEventListener('click', () => dialog.close());
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) dialog.close();
+        });
+
+        // Year/Month calendar picker
+        const dateBtn = document.getElementById('date-picker-btn');
+        const datePopover = document.getElementById('date-picker-popover');
+        const dateLabel = document.getElementById('date-picker-label');
+        const yearInput = document.getElementById('year-input');
+        const monthInput = document.getElementById('month-input');
+        const yearPanel = document.getElementById('year-panel');
+        const monthPanel = document.getElementById('month-panel');
+        const selectedYearLabel = document.getElementById('selected-year-label');
+
+        const monthNames = ["", "January","February","March","April","May","June","July","August","September","October","November","December"];
+
+        function refreshDateLabel() {
+            const y = yearInput.value;
+            const m = monthInput.value;
+            if (!y) {
+                dateLabel.textContent = "All dates";
+            } else if (!m) {
+                dateLabel.textContent = y;
+            } else {
+                dateLabel.textContent = `${monthNames[parseInt(m)]} ${y}`;
+            }
+        }
+
+        dateBtn.addEventListener('click', () => {
+            datePopover.hidden = !datePopover.hidden;
+        });
+
+        yearPanel.querySelectorAll('.date-picker-cell').forEach(cell => {
+            cell.addEventListener('click', () => {
+                const year = cell.dataset.year;
+                yearInput.value = year;
+                monthInput.value = '';
+
+                if (!year) {
+                    refreshDateLabel();
+                    datePopover.hidden = true;
+                    return;
+                }
+
+                selectedYearLabel.textContent = year;
+                yearPanel.hidden = true;
+                monthPanel.hidden = false;
+            });
+        });
+
+        monthPanel.querySelectorAll('.date-picker-cell').forEach(cell => {
+            cell.addEventListener('click', () => {
+                monthInput.value = cell.dataset.month;
+                refreshDateLabel();
+                datePopover.hidden = true;
+            });
+        });
+
+        document.getElementById('back-to-years').addEventListener('click', () => {
+            monthPanel.hidden = true;
+            yearPanel.hidden = false;
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!datePopover.contains(e.target) && e.target !== dateBtn && !dateBtn.contains(e.target)) {
+                datePopover.hidden = true;
+            }
+        });
+
+        refreshDateLabel();
+    </script>
 {% endblock %}
