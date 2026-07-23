@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
+from sqlalchemy import or_, and_, extract
 from types import SimpleNamespace
 from datetime import date
 
@@ -99,6 +99,11 @@ def _grouped_tags(db):
     tags = db.query(models.Tag).all()
     categories = ['country', 'sport', 'abuse_type', 'organisation']
     return {cat: [t for t in tags if t.category == cat] for cat in categories}
+
+def _available_years(db):
+    dates = db.query(models.Article.publish_date).filter(models.Article.publish_date != None).all()
+    years = sorted({d[0].year for d in dates if d[0] is not None}, reverse=True)
+    return years
 
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
@@ -251,7 +256,12 @@ def delete_article(id: int, db: Session = Depends(get_db)):
     return RedirectResponse(url="/", status_code=303)
 
 @app.get("/search", response_class=HTMLResponse)
-def search(request: Request, q: str = None, country: str = None, sport: str = None, abuse_type: str = None, org: str = None, db: Session = Depends(get_db)):
+def search(
+    request: Request, q: str = None, country: str = None, sport: str = None,
+    abuse_type: str = None, org: str = None,
+    year: str = None, month: str = None,
+    db: Session = Depends(get_db)
+):
     query = db.query(models.Article)
 
     if q:
@@ -266,5 +276,20 @@ def search(request: Request, q: str = None, country: str = None, sport: str = No
     if filters:
         query = query.filter(and_(*filters))
 
+    year_int = int(year) if year else None
+    month_int = int(month) if month else None
+
+    if year_int:
+        query = query.filter(extract('year', models.Article.publish_date) == year_int)
+    if month_int:
+        query = query.filter(extract('month', models.Article.publish_date) == month_int)
+
     results = query.order_by(models.Article.added_at.desc()).all()
-    return templates.TemplateResponse(request, "search.html", {"articles": results, "tags": _grouped_tags(db)})
+    active_filter_count = sum(1 for v in [q, country, sport, abuse_type, org, year, month] if v)
+
+    return templates.TemplateResponse(request, "search.html", {
+        "articles": results,
+        "tags": _grouped_tags(db),
+        "available_years": _available_years(db),
+        "active_filter_count": active_filter_count
+    })

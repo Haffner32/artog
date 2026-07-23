@@ -236,18 +236,22 @@ def test_update_article_changes_fields(client, sample_tag):
     assert "REVIEWED" in detail.text
 
 
-def test_update_article_clears_tags_when_none_submitted(client, sample_tag, db_session):
+def test_update_article_rejects_when_no_tags_submitted(client, sample_tag, db_session):
     client.post("/articles/new", data={
         "url": "https://example.com/clear-tags",
         "added_by": "Leo",
         "tags_ids": [str(sample_tag.id)],
     })
-    client.post("/articles/1/edit", data={
+    response = client.post("/articles/1/edit", data={
         "url": "https://example.com/clear-tags",
         "added_by": "Leo",
     })
+    assert response.status_code == 400
+    assert "At least one tag is required" in response.text
+
+    # Original tag should still be intact since the update was rejected
     article = db_session.query(models.Article).get(1)
-    assert article.tags == []
+    assert article.tags == [sample_tag]
 
 
 # ---------------------------------------------------------------------------
