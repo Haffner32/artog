@@ -347,6 +347,137 @@ dialog#filters-dialog::backdrop {
     border-color: #3498db;
 }
 
+/* ---------- Tag dropdown (searchable multi-select) ---------- */
+.tag-dropdown {
+    position: relative;
+}
+
+.tag-dropdown-trigger {
+    width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    background: white;
+    font-size: 15px;
+    cursor: pointer;
+    text-align: left;
+}
+
+.tag-dropdown-arrow {
+    color: #888;
+    font-size: 12px;
+}
+
+.tag-selected-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: #3498db;
+    color: white;
+    padding: 4px 6px 4px 10px;
+    border-radius: 12px;
+    font-size: 13px;
+}
+
+.tag-chip-remove {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+}
+
+.tag-dropdown-panel {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+    overflow: hidden;
+}
+
+.tag-dropdown-search-row {
+    display: flex;
+    gap: 8px;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.tag-dropdown-search-row input {
+    flex: 1;
+    padding: 8px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 15px;
+}
+
+.btn-add-tag {
+    white-space: nowrap;
+    padding: 8px 12px;
+}
+
+.btn-add-tag:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.tag-dropdown-list {
+    max-height: 220px;
+    overflow-y: auto;
+    padding: 6px;
+}
+
+.tag-option {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px;
+    border-radius: 4px;
+    font-weight: normal;
+    cursor: pointer;
+}
+
+.tag-option[hidden] {
+    display: none;
+}
+
+.tag-option:hover {
+    background: #f2f2f2;
+}
+
+.tag-option input {
+    width: auto;
+    margin: 0;
+}
+
+.tag-option-new span {
+    color: #27ae60;
+    font-style: italic;
+}
+
+.tag-dropdown-empty {
+    padding: 12px;
+    color: #888;
+    font-size: 13px;
+    text-align: center;
+}
+
 /* ---------- Mobile breakpoint ---------- */
 @media (max-width: 768px) {
     body {

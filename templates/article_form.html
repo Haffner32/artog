@@ -52,27 +52,39 @@
 
         <div class="tag-section">
             <h2>Tags</h2>
-            <p><small>Select existing tags or add new ones in the "New Tags" box below.</small></p>
-            
+            <p><small>Search each category for a tag. If it doesn't exist yet, type it and click "+ Add".</small></p>
+
             {% for category, cat_tags in tags.items() %}
                 <div class="tag-category">
                     <label>{{ category | replace('_', ' ') | capitalize }}</label>
-                    <div class="tag-checkboxes">
-                        {% for tag in cat_tags %}
-                            <label>
-                                <input type="checkbox" name="tags_ids" value="{{ tag.id }}" 
-                                {{ 'checked' if article and tag in article.tags else '' }}>
-                                {{ tag.name }}
-                            </label>
-                        {% endfor %}
+                    <div class="tag-dropdown" data-category="{{ category }}">
+                        <button type="button" class="tag-dropdown-trigger">
+                            <span class="tag-dropdown-summary">Select {{ category | replace('_',' ') }}...</span>
+                            <span class="tag-dropdown-arrow">▾</span>
+                        </button>
+                        <div class="tag-selected-chips"></div>
+
+                        <div class="tag-dropdown-panel" hidden>
+                            <div class="tag-dropdown-search-row">
+                                <input type="text" class="tag-search-input" placeholder="Search or type a new tag...">
+                                <button type="button" class="btn btn-secondary btn-add-tag" disabled>+ Add</button>
+                            </div>
+                            <div class="tag-dropdown-list">
+                                {% for tag in cat_tags %}
+                                    <label class="tag-option" data-name="{{ tag.name|lower }}">
+                                        <input type="checkbox" name="tags_ids" value="{{ tag.id }}"
+                                            {{ 'checked' if article and tag in article.tags else '' }}>
+                                        <span>{{ tag.name }}</span>
+                                    </label>
+                                {% endfor %}
+                            </div>
+                            <div class="tag-dropdown-empty" hidden>No matching tags. Type a name and click "+ Add".</div>
+                        </div>
                     </div>
                 </div>
             {% endfor %}
 
-            <div class="form-group" style="margin-top: 20px; border-top: 1px solid #ccc; padding-top: 15px;">
-                <label for="new_tags">Add New Custom Tags</label>
-                <input type="text" id="new_tags" name="new_tags" placeholder="category:value, category:value (e.g. sport:Curling, country:Norway)">
-            </div>
+            <input type="hidden" id="new_tags" name="new_tags" value="">
         </div>
 
         <div style="margin-top: 20px;">
@@ -153,6 +165,157 @@
             } finally {
                 autofillBtn.disabled = false;
             }
+        });
+    </script>
+
+    <script>
+        document.querySelectorAll('.tag-dropdown').forEach(initTagDropdown);
+
+        function initTagDropdown(container) {
+            const category = container.dataset.category;
+            const trigger = container.querySelector('.tag-dropdown-trigger');
+            const summary = container.querySelector('.tag-dropdown-summary');
+            const chipsWrap = container.querySelector('.tag-selected-chips');
+            const panel = container.querySelector('.tag-dropdown-panel');
+            const searchInput = container.querySelector('.tag-search-input');
+            const addBtn = container.querySelector('.btn-add-tag');
+            const list = container.querySelector('.tag-dropdown-list');
+            const emptyMsg = container.querySelector('.tag-dropdown-empty');
+
+            const newTags = []; // { name, optionEl }
+
+            const existingCheckboxes = () =>
+                Array.from(list.querySelectorAll('input[type="checkbox"][name="tags_ids"]'));
+
+            const allOptions = () => Array.from(list.querySelectorAll('.tag-option'));
+
+            const currentNames = () => allOptions().map(l => l.dataset.name);
+
+            function renderChips() {
+                chipsWrap.innerHTML = '';
+                const chosen = [];
+
+                existingCheckboxes().forEach(cb => {
+                    if (cb.checked) {
+                        const name = cb.closest('.tag-option').querySelector('span').textContent;
+                        chosen.push({ type: 'existing', checkbox: cb, name });
+                    }
+                });
+
+                newTags.forEach(nt => chosen.push({ type: 'new', name: nt.name, entry: nt }));
+
+                chosen.forEach(item => {
+                    const chip = document.createElement('span');
+                    chip.className = 'tag-chip';
+                    chip.textContent = item.name;
+
+                    const x = document.createElement('button');
+                    x.type = 'button';
+                    x.className = 'tag-chip-remove';
+                    x.textContent = '×';
+                    x.addEventListener('click', () => {
+                        if (item.type === 'existing') {
+                            item.checkbox.checked = false;
+                        } else {
+                            const idx = newTags.indexOf(item.entry);
+                            if (idx > -1) newTags.splice(idx, 1);
+                            item.entry.optionEl.remove();
+                        }
+                        renderChips();
+                    });
+
+                    chip.appendChild(x);
+                    chipsWrap.appendChild(chip);
+                });
+
+                summary.textContent = chosen.length
+                    ? `${chosen.length} selected`
+                    : `Select ${category.replace('_', ' ')}...`;
+            }
+
+            function filterList() {
+                const q = searchInput.value.trim().toLowerCase();
+                let anyVisible = false;
+
+                allOptions().forEach(opt => {
+                    const match = !q || opt.dataset.name.includes(q);
+                    opt.hidden = !match;
+                    if (match) anyVisible = true;
+                });
+
+                emptyMsg.hidden = anyVisible || !q;
+                addBtn.disabled = !q || currentNames().includes(q);
+            }
+
+            function addNewTag() {
+                const name = searchInput.value.trim();
+                if (!name || currentNames().includes(name.toLowerCase())) return;
+
+                const label = document.createElement('label');
+                label.className = 'tag-option tag-option-new';
+                label.dataset.name = name.toLowerCase();
+
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.checked = true;
+
+                const span = document.createElement('span');
+                span.textContent = name + ' (new)';
+
+                label.appendChild(cb);
+                label.appendChild(span);
+                list.appendChild(label);
+
+                const entry = { name, optionEl: label };
+                newTags.push(entry);
+
+                cb.addEventListener('change', () => {
+                    if (!cb.checked) {
+                        const idx = newTags.indexOf(entry);
+                        if (idx > -1) newTags.splice(idx, 1);
+                        label.remove();
+                        renderChips();
+                    }
+                });
+
+                searchInput.value = '';
+                filterList();
+                renderChips();
+            }
+
+            trigger.addEventListener('click', () => {
+                const wasHidden = panel.hidden;
+                document.querySelectorAll('.tag-dropdown-panel').forEach(p => p.hidden = true);
+                panel.hidden = !wasHidden;
+                if (!panel.hidden) searchInput.focus();
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!container.contains(e.target)) panel.hidden = true;
+            });
+
+            searchInput.addEventListener('input', filterList);
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (!addBtn.disabled) addNewTag();
+                }
+            });
+            addBtn.addEventListener('click', addNewTag);
+            existingCheckboxes().forEach(cb => cb.addEventListener('change', renderChips));
+
+            container._getNewTags = () => newTags.map(nt => `${category}:${nt.name}`);
+
+            filterList();
+            renderChips();
+        }
+
+        document.getElementById('article-form').addEventListener('submit', () => {
+            const parts = [];
+            document.querySelectorAll('.tag-dropdown').forEach(c => {
+                if (c._getNewTags) parts.push(...c._getNewTags());
+            });
+            document.getElementById('new_tags').value = parts.join(', ');
         });
     </script>
 {% endblock %}
