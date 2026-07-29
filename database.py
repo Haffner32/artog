@@ -9,8 +9,9 @@ SQLALCHEMY_DATABASE_URL = os.environ.get(
 )
 
 engine = create_engine(
-    SQLALCHEMY_DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"sslmode": "require"} if SQLALCHEMY_DATABASE_URL.startswith("postgresql") else {}
+)
 Base = declarative_base()
 
 def get_db():
