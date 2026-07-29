@@ -8,10 +8,13 @@ SQLALCHEMY_DATABASE_URL = os.environ.get(
     "postgresql://adenchan@localhost:5432/safesport"
 )
 
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL,
-    connect_args={"sslmode": "require"} if SQLALCHEMY_DATABASE_URL.startswith("postgresql") else {}
-)
+if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
+    SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+connect_args = {"sslmode": "require"} if "neon.tech" in SQLALCHEMY_DATABASE_URL else {}
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args=connect_args)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 def get_db():
@@ -22,9 +25,7 @@ def get_db():
         db.close()
 
 def seed_data(db):
-    """Populates the tags table with initial controlled vocabulary if empty."""
-    # IMPORT INSIDE FUNCTION to prevent Circular Import error
-    from models import Tag 
+    from models import Tag
 
     if db.query(Tag).first():
         return
@@ -55,5 +56,5 @@ def seed_data(db):
     for tag_data in starter_tags:
         tag = Tag(name=tag_data["name"], category=tag_data["category"])
         db.add(tag)
-    
+
     db.commit()
