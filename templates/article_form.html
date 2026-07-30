@@ -246,9 +246,14 @@
                 emptyMsg.hidden = anyVisible || !q;
                 addBtn.disabled = !q || currentNames().includes(q);
             }
+            function toTitleCase(str) {
+                return str.trim().split(/\s+/)
+                    .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                    .join(' ');
+            }
 
             function addNewTag() {
-                const name = searchInput.value.trim();
+                const name = toTitleCase(searchInput.value);
                 if (!name || currentNames().includes(name.toLowerCase())) return;
 
                 const label = document.createElement('label');

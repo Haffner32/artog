@@ -174,7 +174,8 @@ def create_article(
         for entry in new_tags.split(','):
             if ':' in entry:
                 cat, val = entry.split(':', 1)
-                cat, val = cat.strip(), val.strip()
+                cat = cat.strip()
+                val = val.strip().title()
                 tag = db.query(models.Tag).filter_by(name=val, category=cat).first()
                 if not tag:
                     tag = models.Tag(name=val, category=cat)
@@ -236,7 +237,8 @@ def update_article(
         for entry in new_tags.split(','):
             if ':' in entry:
                 cat, val = entry.split(':', 1)
-                cat, val = cat.strip(), val.strip()
+                cat = cat.strip()
+                val = val.strip().title()
                 tag = db.query(models.Tag).filter_by(name=val, category=cat).first()
                 if not tag:
                     tag = models.Tag(name=val, category=cat)
