@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <div class="page-header">
+        <div>
+            <h1>Manage Tags</h1>
+            <p>Remove tags that were misspelled or are no longer needed. Removing a tag also takes it off any articles currently using it — this can't be undone.</p>
+        </div>
+    </div>
+
+    {% if message %}
+        <div class="error" style="background-color: #d4edda; color: #155724; border-color: #c3e6cb;">{{ message }}</div>
+    {% endif %}
+
+    <div class="tag-section">
+        {% for category, cat_tags in tags.items() %}
+            <div class="tag-category">
+                <label>{{ category | replace('_', ' ') | capitalize }}</label>
+                {% if cat_tags %}
+                    <div class="tag-checkboxes" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+                        {% for tag in cat_tags %}
+                            <div style="display: flex; align-items: center; justify-content: space-between; background: white; padding: 6px 10px; border-radius: 6px; border: 1px solid #ddd;">
+                                <span>
+                                    {{ tag.name }}
+                                    <small style="color: #888;">({{ tag.article_count }} article{{ 's' if tag.article_count != 1 else '' }})</small>
+                                </span>
+                                <form action="/tags/{{ tag.id }}/delete" method="post" style="margin: 0;"
+                                      onsubmit="return confirmTagDelete('{{ tag.name | replace("'", "\\'") }}', {{ tag.article_count }})">
+                                    <button type="submit" class="btn btn-danger" style="padding: 4px 8px; font-size: 12px;">Remove</button>
+                                </form>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <span class="tag-empty">No tags in this category.</span>
+                {% endif %}
+            </div>
+        {% endfor %}
+    </div>
+
+    <div style="margin-top: 20px;">
+        <a href="/" class="btn btn-secondary">← Back to Home</a>
+    </div>
+
+    <script>
+        function confirmTagDelete(name, count) {
+            if (count > 0) {
+                return confirm(`"${name}" is used on ${count} article${count === 1 ? '' : 's'}. Removing it will also remove it from ${count === 1 ? 'that article' : 'those articles'}. Continue?`);
+            }
+            return confirm(`Remove the tag "${name}"?`);
+        }
+    </script>
+{% endblock %}
