@@ -5,8 +5,8 @@ from sqlalchemy.orm import sessionmaker
 
 SQLALCHEMY_DATABASE_URL = os.environ.get(
     "DATABASE_URL",
-    "postgresql://adenchan@localhost:5432/safesport"
-)
+    "postgresql://@localhost:5432/safesport"
+
 
 if SQLALCHEMY_DATABASE_URL.startswith("postgres://"):
     SQLALCHEMY_DATABASE_URL = SQLALCHEMY_DATABASE_URL.replace("postgres://", "postgresql://", 1)
