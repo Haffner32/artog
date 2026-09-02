@@ -105,6 +105,32 @@ def _available_years(db):
     years = sorted({d[0].year for d in dates if d[0] is not None}, reverse=True)
     return years
 
+def _grouped_tags_with_counts(db):
+    """Same shape as _grouped_tags, but each tag gets an `article_count` attribute
+    so the manage-tags page can warn before deleting an in-use tag."""
+    tags = db.query(models.Tag).all()
+    categories = ['country', 'sport', 'abuse_type', 'organisation']
+    grouped = {cat: [] for cat in categories}
+    for t in tags:
+        t.article_count = len(t.articles)
+        if t.category in grouped:
+            grouped[t.category].append(t)
+    return grouped
+
+@app.get("/tags/manage", response_class=HTMLResponse)
+def manage_tags(request: Request, db: Session = Depends(get_db)):
+    return templates.TemplateResponse(request, "manage_tags.html", {"tags": _grouped_tags_with_counts(db)})
+
+@app.post("/tags/{id}/delete")
+def delete_tag(id: int, db: Session = Depends(get_db)):
+    tag = db.get(models.Tag, id)
+    if not tag:
+        raise HTTPException(status_code=404, detail=f"Tag with id {id} not found")
+    db.delete(tag)
+    db.commit()
+    return RedirectResponse(url="/tags/manage", status_code=303)
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request, db: Session = Depends(get_db)):
     articles = db.query(models.Article).order_by(models.Article.added_at.desc()).all()

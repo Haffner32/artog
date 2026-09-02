@@ -325,3 +325,120 @@ def test_search_by_country_tag_filters_results(client, db_session):
     response = client.get("/search", params={"country": "Singapore"})
     assert "SG Story" in response.text
     assert "US Story" not in response.text
+
+#---------------------------------------------------------------------------
+#Manage tags page (GET /tags/manage)
+#---------------------------------------------------------------------------
+
+def test_manage_tags_page_loads(client):
+    response = client.get("/tags/manage")
+    assert response.status_code == 200
+    assert "Manage Tags" in response.text
+ 
+ 
+def test_manage_tags_page_lists_seeded_tags(client):
+    response = client.get("/tags/manage")
+    assert response.status_code == 200
+    # Singapore is one of the seeded country tags
+    assert "Singapore" in response.text
+ 
+ 
+def test_manage_tags_page_shows_article_count_for_unused_tag(client, sample_tag):
+    response = client.get("/tags/manage")
+    assert response.status_code == 200
+    assert "(0 articles)" in response.text
+ 
+ 
+def test_manage_tags_page_shows_article_count_for_used_tag(client, sample_tag):
+    client.post("/articles/new", data={
+        "url": "https://example.com/tag-count-story",
+        "title": "Tag Count Story",
+        "added_by": "Peggy",
+        "tags_ids": [str(sample_tag.id)],
+    })
+    response = client.get("/tags/manage")
+    assert response.status_code == 200
+    assert "(1 article)" in response.text
+ 
+ 
+# ---------------------------------------------------------------------------
+# Delete tag (POST /tags/{id}/delete)
+# ---------------------------------------------------------------------------
+ 
+def test_delete_unused_tag_succeeds(client, db_session, sample_tag):
+    tag_id = sample_tag.id
+    response = client.post(f"/tags/{tag_id}/delete", follow_redirects=False)
+ 
+    assert response.status_code == 303
+    assert response.headers["location"] == "/tags/manage"
+    assert db_session.get(models.Tag, tag_id) is None
+ 
+ 
+def test_delete_tag_removes_it_from_manage_page(client, sample_tag):
+    client.post(f"/tags/{sample_tag.id}/delete")
+    response = client.get("/tags/manage")
+    assert response.status_code == 200
+    assert "Singapore" not in response.text
+ 
+ 
+def test_delete_tag_in_use_succeeds_and_detaches_from_article(client, db_session, sample_tag):
+    client.post("/articles/new", data={
+        "url": "https://example.com/misspelled-tag-story",
+        "title": "Misspelled Tag Story",
+        "added_by": "Rupert",
+        "tags_ids": [str(sample_tag.id)],
+    })
+ 
+    tag_id = sample_tag.id
+    response = client.post(f"/tags/{tag_id}/delete", follow_redirects=False)
+    assert response.status_code == 303
+ 
+    # Tag itself is gone
+    assert db_session.get(models.Tag, tag_id) is None
+ 
+    # Article still exists, but no longer references the deleted tag
+    article = db_session.query(models.Article).filter_by(
+        url="https://example.com/misspelled-tag-story"
+    ).first()
+    assert article is not None
+    assert tag_id not in [t.id for t in article.tags]
+ 
+ 
+def test_delete_tag_in_use_does_not_delete_the_article(client, sample_tag):
+    client.post("/articles/new", data={
+        "url": "https://example.com/keep-article-story",
+        "title": "Keep Article Story",
+        "added_by": "Sybil",
+        "tags_ids": [str(sample_tag.id)],
+    })
+    client.post(f"/tags/{sample_tag.id}/delete")
+ 
+    response = client.get("/articles/1")
+    assert response.status_code == 200
+    assert "Keep Article Story" in response.text
+ 
+ 
+def test_delete_nonexistent_tag_returns_404(client):
+    response = client.post("/tags/999999/delete")
+    assert response.status_code == 404
+ 
+ 
+def test_delete_tag_does_not_affect_other_tags_on_same_article(client, db_session):
+    country_tag = db_session.query(models.Tag).filter_by(name="Singapore", category="country").first()
+    sport_tag = db_session.query(models.Tag).filter_by(name="Swimming", category="sport").first()
+ 
+    client.post("/articles/new", data={
+        "url": "https://example.com/multi-tag-story",
+        "title": "Multi Tag Story",
+        "added_by": "Trent",
+        "tags_ids": [str(country_tag.id), str(sport_tag.id)],
+    })
+ 
+    client.post(f"/tags/{country_tag.id}/delete")
+ 
+    article = db_session.query(models.Article).filter_by(
+        url="https://example.com/multi-tag-story"
+    ).first()
+    remaining_names = [t.name for t in article.tags]
+    assert "Singapore" not in remaining_names
+    assert "Swimming" in remaining_names
